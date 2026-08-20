@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+
+# CIEL runtime data — this is user data, not code, and shouldn't be
+# committed. Each environment generates its own.
+system/ciel_data/
+ciel0-from-scratch/**/checkpoints/
+ciel0-from-scratch/**/*.pt
+ciel0-from-scratch/**/*.bin
+ciel0-from-scratch/**/data/*.txt
+ciel0-from-scratch/**/data/*.jsonl
+
+# OS / editor
+.DS_Store
+.vscode/settings.json
+*.swp
