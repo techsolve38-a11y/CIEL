@@ -19,3 +19,6 @@ ciel0-from-scratch/**/data/*.jsonl
 .DS_Store
 .vscode/settings.json
 *.swp
+
+ciel0-from-scratch/tinyshakespeare.txt 
+ciel0-from-scratch/tiny_gpt_checkpoint.pt
