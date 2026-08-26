@@ -188,7 +188,18 @@ try:
     ckpt = torch.load(CHECKPOINT_PATH, weights_only=True)
     model.load_state_dict(ckpt["model_state"])
     start_step = ckpt["total_steps"]
-    print(f"\nResumed from checkpoint at step {start_step}.")
+    if "optimizer_state" in ckpt:
+        optimizer.load_state_dict(ckpt["optimizer_state"])
+        print(f"\nResumed from checkpoint at step {start_step} (optimizer state restored too).")
+    else:
+        # Backward-compat: an OLD-format checkpoint (from before item 18's
+        # fix) has no optimizer state to restore. Model weights still load
+        # correctly — only Adam's momentum/variance restart from zero this
+        # one time. From this save onward, the new format keeps it.
+        print(f"\nResumed from checkpoint at step {start_step}. "
+              f"(Old checkpoint format — no optimizer state found, so Adam's "
+              f"momentum restarts fresh this one time. Future resumes will "
+              f"carry it forward correctly.)")
 except FileNotFoundError:
     print("\nNo checkpoint found — starting fresh.")
 
@@ -211,6 +222,7 @@ for step in range(STEPS_THIS_RUN):
 
 torch.save({
     "model_state": model.state_dict(),
+    "optimizer_state": optimizer.state_dict(),   # FIX (see item 18)
     "total_steps": start_step + STEPS_THIS_RUN,
 }, CHECKPOINT_PATH)
 print(f"\nCheckpoint saved after {start_step + STEPS_THIS_RUN} total steps.")
