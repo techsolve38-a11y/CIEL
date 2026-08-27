@@ -292,3 +292,13 @@ for instruction in ["GREET", "FAREWELL", "INSULT"]:
 
 print("\n--- Confirming pretrained Shakespeare capability wasn't destroyed ---")
 print(generate_text(model, "\nROMEO:", max_new_tokens=100))
+
+# --- Save the fine-tuned model for later interactive use --------------------
+torch.save({
+    "model_state": model.state_dict(),
+    "base_vocab_size": base_vocab_size,
+    "special_tokens": special_tokens,
+    "d_model": d_model, "n_heads": n_heads, "n_layers": n_layers,
+    "d_ff": d_ff, "block_size": block_size,
+}, "fine_tuned_checkpoint.pt")
+print(f"\nFine-tuned model saved to fine_tuned_checkpoint.pt")
