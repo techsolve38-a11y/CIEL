@@ -1,37 +1,40 @@
 """
 CIEL Cognitive Orchestrator
 ------------------------------
-Per Development Plan Phase I §5:
+UPDATE (reasoning engine choice): per an explicit decision to prioritize
+genuine independence over working polish, CIEL-0 is now the DEFAULT
+reasoning engine — no external model, no API, no dependency on anyone
+else's weights, paid or free. Ollama and Claude remain available as
+options (Orchestrator(engine="ollama") / engine="claude") for later, but
+neither is the default anymore.
 
-  Core flow: User -> CIEL Orchestrator -> Context/Memory/Skills/Tools
-             -> Reasoning -> Action/Response -> Evaluation -> Memory.
-
-At Phase I, the "reasoning" step is delegated to an external LLM
-(Claude) acting as CIEL's interim cognitive engine — per Development
-Plan Phase II §7, external models are cognitive resources CIEL uses;
-they are not CIEL itself. The from-scratch CIEL-0 model can be dropped
-in later behind this same interface without touching the surrounding
-architecture (constitution, memory, skills, tools, evaluation).
+HONEST STATE: CIEL-0 today cannot hold a real conversation — this was
+proven directly in testing, not assumed. Choosing engine="ciel0" means
+choosing a system that runs entirely independently, in exchange for
+weak, often incoherent responses until CIEL-0 grows. That trade-off was
+made deliberately and explicitly, not by accident.
 """
 
 from __future__ import annotations
 
 import os
 
-from anthropic import Anthropic
-
 from ciel.constitution.loader import load_constitution, verify_integrity
 from ciel.memory.store import MemoryStore
 from ciel.user_model.profile import UserProfileStore
 from ciel.skills.registry import SkillRegistry, seed_default_skills
+from ciel.skills.handlers import EXECUTABLE_SKILLS, pattern_recognition_handler
 from ciel.tools.framework import default_tool_registry
 from ciel.evaluation.evaluator import Evaluator
+from ciel.orchestrator.engines import OllamaEngine, ClaudeEngine, CIEL0Engine
 
-INTERIM_MODEL = "claude-sonnet-4-6"
+CLAUDE_MODEL = "claude-sonnet-4-6"
+WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search", "max_uses": 3}
 
 
 class Orchestrator:
-    def __init__(self):
+    def __init__(self, engine: str = "ciel0", enable_web_search: bool = True,
+                 ollama_model: str = "llama3.2", ciel0_checkpoint: str = "ciel0_checkpoint.pt"):
         self.constitution = load_constitution()
         if not verify_integrity(self.constitution):
             raise RuntimeError(
@@ -44,9 +47,24 @@ class Orchestrator:
         seed_default_skills(self.skills)
         self.tools = default_tool_registry()
         self.evaluator = Evaluator()
+        self.engine_name = engine
 
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
-        self._client = Anthropic(api_key=api_key) if api_key else None
+        if engine == "ciel0":
+            self.engine = CIEL0Engine(checkpoint_path=ciel0_checkpoint)
+        elif engine == "ollama":
+            self.engine = OllamaEngine(model=ollama_model)
+        elif engine == "claude":
+            from anthropic import Anthropic
+            api_key = os.environ.get("ANTHROPIC_API_KEY")
+            client = Anthropic(api_key=api_key) if api_key else None
+            if client is None:
+                raise RuntimeError("engine='claude' requires ANTHROPIC_API_KEY to be set.")
+            tools = [e["tool_schema"] for e in EXECUTABLE_SKILLS.values()]
+            if enable_web_search:
+                tools.append(WEB_SEARCH_TOOL)
+            self.engine = ClaudeEngine(client=client, model=CLAUDE_MODEL, tools=tools, memory_store=self.memory)
+        else:
+            raise ValueError(f"Unknown engine '{engine}'. Use 'ciel0', 'ollama', or 'claude'.")
 
     # ---- Context assembly -------------------------------------------------
     def _assemble_context(self, user_input: str) -> str:
@@ -63,45 +81,33 @@ class Orchestrator:
             "",
             "=== RECENT MEMORY (most relevant) ===",
             "\n".join(f"- [{m.category}, confidence={m.confidence}] {m.content}" for m in relevant_memories) or "None yet.",
+        ]
+
+        # Neither CIEL-0 nor Ollama support Claude's native tool-use, so
+        # cheap/free skills get computed proactively and folded directly
+        # into context — reliable regardless of which engine is running.
+        if self.engine_name in ("ciel0", "ollama") and "Pattern Recognition" in EXECUTABLE_SKILLS:
+            pattern_result = pattern_recognition_handler({}, self.memory)
+            parts += ["", "=== COMPUTED: PATTERN RECOGNITION ===", pattern_result]
+
+        parts += [
             "",
             "=== AVAILABLE SKILLS ===",
             "\n".join(f"- {s['name']} ({s['category']}): {s['purpose']}" for s in skill_summaries),
             "",
-            "=== AVAILABLE TOOLS (this Phase I build; most are not yet wired to real handlers) ===",
+            "=== AVAILABLE TOOLS ===",
             "\n".join(f"- {t['name']} [{t['permission']}]: {t['description']}" for t in tool_summaries),
             "",
-            "Respond as CIEL. Be direct, honest about uncertainty, and grounded "
-            "in the constitution above rather than generic assistant behavior.",
+            "Respond as CIEL. Be direct and grounded in the constitution above.",
         ]
         return "\n".join(parts)
 
     # ---- Core loop ----------------------------------------------------------
     def process(self, user_input: str) -> str:
-        if self._client is None:
-            return (
-                "[CIEL orchestrator is wired and ready, but no ANTHROPIC_API_KEY is set "
-                "in the environment, so the reasoning engine can't be called yet. "
-                "Set ANTHROPIC_API_KEY to activate reasoning.]"
-            )
-
         system_context = self._assemble_context(user_input)
-        response = self._client.messages.create(
-            model=INTERIM_MODEL,
-            max_tokens=1500,
-            system=system_context,
-            messages=[{"role": "user", "content": user_input}],
-        )
-        text = "".join(block.text for block in response.content if block.type == "text")
+        text = self.engine.generate(system_context, user_input)
 
-        # Minimal evaluation logging (Phase I: self-reported placeholder scores
-        # until a real grading mechanism exists — presence of the record matters
-        # more than its precision at this stage).
-        self.evaluator.log(
-            interaction_summary=user_input[:120],
-            scores={"task_completion": 1.0, "safety": 1.0},
-        )
-
-        # Store the exchange itself as an experience memory.
+        self.evaluator.log(interaction_summary=user_input[:120], scores={"task_completion": 1.0, "safety": 1.0})
         self.memory.add(
             category="experiences",
             content=f"User asked: {user_input[:200]} | CIEL responded: {text[:200]}",

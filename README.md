@@ -29,3 +29,9 @@ scratch in numpy (Track A checkpoint).
 
 Early. `system/` runs end-to-end against Claude as the interim brain.
 `ciel0-from-scratch/` has just started (Track A of the curriculum).
+
+Information About Track 7
+Why RNNs weren't enough. Before attention, the standard approach to sequences was the Recurrent Neural Network: process tokens one at a time, left to right, carrying a single "hidden state" vector forward as a summary of everything seen so far. Two structural problems fall out of that design:
+
+Sequential bottleneck. Token 50 can only be processed after token 49 is done, which is done only after token 48 — no parallelism across the sequence. On modern hardware built for massively parallel matrix multiplication, this is a severe waste, and it's a huge part of why training used to take so much longer per token of data.
+Information gets squeezed through one vector. Everything the model has seen — potentially thousands of tokens back — has to be compressed into that single fixed-size hidden state before token 50 can use it. Early information reliably gets diluted or overwritten by the time you're deep into a long sequence — this is the "long-range dependency" problem, and it's the direct motivation for attention.

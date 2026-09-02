@@ -22,3 +22,15 @@ ciel0-from-scratch/**/data/*.jsonl
 
 ciel0-from-scratch/tinyshakespeare.txt 
 ciel0-from-scratch/tiny_gpt_checkpoint.pt
+
+# Secrets and credentials
+system/integrations/credentials.json
+system/integrations/token.json
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Model checkpoints
+*.pt
