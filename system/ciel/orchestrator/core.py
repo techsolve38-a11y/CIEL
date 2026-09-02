@@ -23,7 +23,7 @@ from ciel.constitution.loader import load_constitution, verify_integrity
 from ciel.memory.store import MemoryStore
 from ciel.user_model.profile import UserProfileStore
 from ciel.skills.registry import SkillRegistry, seed_default_skills
-from ciel.skills.handlers import EXECUTABLE_SKILLS, pattern_recognition_handler
+from ciel.skills.handlers import EXECUTABLE_SKILLS, pattern_recognition_handler, research_handler, should_trigger_research
 from ciel.tools.framework import default_tool_registry
 from ciel.evaluation.evaluator import Evaluator
 from ciel.orchestrator.engines import OllamaEngine, ClaudeEngine, CIEL0Engine
@@ -86,9 +86,14 @@ class Orchestrator:
         # Neither CIEL-0 nor Ollama support Claude's native tool-use, so
         # cheap/free skills get computed proactively and folded directly
         # into context — reliable regardless of which engine is running.
-        if self.engine_name in ("ciel0", "ollama") and "Pattern Recognition" in EXECUTABLE_SKILLS:
-            pattern_result = pattern_recognition_handler({}, self.memory)
-            parts += ["", "=== COMPUTED: PATTERN RECOGNITION ===", pattern_result]
+        if self.engine_name in ("ciel0", "ollama"):
+            if "Pattern Recognition" in EXECUTABLE_SKILLS:
+                pattern_result = pattern_recognition_handler({}, self.memory)
+                parts += ["", "=== COMPUTED: PATTERN RECOGNITION ===", pattern_result]
+
+            if "Research" in EXECUTABLE_SKILLS and should_trigger_research(user_input):
+                research_result = research_handler({"query": user_input}, self.memory)
+                parts += ["", "=== COMPUTED: WEB RESEARCH (free, real result) ===", research_result]
 
         parts += [
             "",

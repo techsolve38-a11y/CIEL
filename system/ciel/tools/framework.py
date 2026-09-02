@@ -7,6 +7,7 @@ user authorization."
 """
 
 from __future__ import annotations
+from ciel.tools.documents_handler import create_document
 
 import dataclasses
 from enum import Enum
@@ -64,7 +65,7 @@ def default_tool_registry() -> ToolRegistry:
     reg.register(Tool("database", "Query/update structured data stores", Permission.ALLOWED))
     reg.register(Tool("code_execution", "Execute code in a sandbox", Permission.REQUIRES_AUTHORIZATION))
     reg.register(Tool("external_api", "Call external/third-party APIs", Permission.REQUIRES_AUTHORIZATION))
-    reg.register(Tool("documents", "Create/edit documents", Permission.ALLOWED))
+    reg.register(Tool("documents", "Create/edit documents", Permission.ALLOWED, handler=create_document))
     reg.register(Tool("local_applications", "Control local applications", Permission.REQUIRES_AUTHORIZATION))
     reg.register(Tool("business_systems", "Interact with business/financial systems", Permission.REQUIRES_AUTHORIZATION))
     reg.register(Tool("external_ai_models", "Call other AI models as cognitive resources", Permission.ALLOWED))

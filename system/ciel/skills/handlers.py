@@ -55,6 +55,35 @@ def pattern_recognition_handler(tool_input: dict, memory_store) -> str:
     return "\n".join(lines)
 
 
+def research_handler(tool_input: dict, memory_store) -> str:
+    """Real, free web research — DuckDuckGo + Wikipedia, no API key, no
+    cost. Works identically regardless of which reasoning engine is
+    running, since it's plain Python making HTTP calls, not something
+    routed through any LLM provider."""
+    from ciel.skills.free_research import web_research
+    query = tool_input.get("query", "").strip()
+    if not query:
+        return "No query provided to research."
+    return web_research(query)
+
+
+# Keywords suggesting the user wants current/factual information CIEL
+# should look up rather than guess — used ONLY for engines without native
+# tool-use (ciel0, ollama), where Claude's "decide when to call a tool"
+# mechanism isn't available. This is a deliberately simple heuristic, not
+# a smart classifier — it will have false positives and misses, and
+# that's an accepted, honest trade-off for reliability across any model.
+RESEARCH_TRIGGER_KEYWORDS = (
+    "what is", "who is", "when did", "when was", "current", "latest",
+    "look up", "search for", "how many", "where is",
+)
+
+
+def should_trigger_research(user_input: str) -> bool:
+    lowered = user_input.lower()
+    return any(kw in lowered for kw in RESEARCH_TRIGGER_KEYWORDS)
+
+
 # --- Registry: maps skill name -> (Anthropic tool schema, handler function) ---
 # Only skills with a REAL implementation appear here. A skill can exist in
 # skills/registry.py's metadata without appearing here — that just means
@@ -82,6 +111,28 @@ EXECUTABLE_SKILLS: dict[str, dict] = {
             },
         },
         "handler": pattern_recognition_handler,
+    },
+    "Research": {
+        "tool_schema": {
+            "name": "research",
+            "description": (
+                "Look up current, factual, or general-knowledge information "
+                "using free public sources (DuckDuckGo, Wikipedia). Use this "
+                "when the user asks something you shouldn't guess at — facts, "
+                "definitions, current events, or anything time-sensitive."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The search query — as specific as possible.",
+                    }
+                },
+                "required": ["query"],
+            },
+        },
+        "handler": research_handler,
     },
 }
 
