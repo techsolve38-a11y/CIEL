@@ -84,6 +84,48 @@ def should_trigger_research(user_input: str) -> bool:
     return any(kw in lowered for kw in RESEARCH_TRIGGER_KEYWORDS)
 
 
+def activity_summary_handler(tool_input: dict, memory_store) -> str:
+    """Cross-references ALL connected data sources (calendar, gmail, drive,
+    past experiences) into one summary. Distinct from pattern_recognition
+    (which looks for RECURRENCE) — this one is about breadth: what's
+    actually going on right now, across everything CIEL has access to."""
+    all_memories = memory_store.query(limit=200)
+    if not all_memories:
+        return "No data available to summarize yet."
+
+    by_source: dict[str, list] = {}
+    for m in all_memories:
+        by_source.setdefault(m.source, []).append(m.content)
+
+    lines = [f"Activity summary across {len(by_source)} connected sources:"]
+    source_labels = {
+        "google_calendar": "Upcoming calendar events",
+        "gmail": "Recent emails",
+        "google_drive": "Recently modified files",
+        "orchestrator": "Recent CIEL conversations",
+    }
+    for source, items in by_source.items():
+        label = source_labels.get(source, source)
+        lines.append(f"\n{label} ({len(items)}):")
+        for item in items[:5]:   # cap per-source to keep the summary readable
+            lines.append(f"  - {item}")
+        if len(items) > 5:
+            lines.append(f"  ... and {len(items) - 5} more")
+
+    return "\n".join(lines)
+
+
+ACTIVITY_SUMMARY_TRIGGER_KEYWORDS = (
+    "summarize", "summary", "recap", "catch me up", "what have i been",
+    "what's going on", "whats going on", "overview", "update me",
+)
+
+
+def should_trigger_activity_summary(user_input: str) -> bool:
+    lowered = user_input.lower()
+    return any(kw in lowered for kw in ACTIVITY_SUMMARY_TRIGGER_KEYWORDS)
+
+
 # --- Registry: maps skill name -> (Anthropic tool schema, handler function) ---
 # Only skills with a REAL implementation appear here. A skill can exist in
 # skills/registry.py's metadata without appearing here — that just means
@@ -133,6 +175,18 @@ EXECUTABLE_SKILLS: dict[str, dict] = {
             },
         },
         "handler": research_handler,
+    },
+    "Communication": {
+        "tool_schema": {
+            "name": "activity_summary",
+            "description": (
+                "Summarize recent activity across ALL connected personal data "
+                "sources (calendar, email, files, past conversations). Use this "
+                "when the user asks for a recap, overview, or 'catch me up.'"
+            ),
+            "input_schema": {"type": "object", "properties": {}},
+        },
+        "handler": activity_summary_handler,
     },
 }
 

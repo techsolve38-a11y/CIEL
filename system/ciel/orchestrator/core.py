@@ -23,7 +23,10 @@ from ciel.constitution.loader import load_constitution, verify_integrity
 from ciel.memory.store import MemoryStore
 from ciel.user_model.profile import UserProfileStore
 from ciel.skills.registry import SkillRegistry, seed_default_skills
-from ciel.skills.handlers import EXECUTABLE_SKILLS, pattern_recognition_handler, research_handler, should_trigger_research
+from ciel.skills.handlers import (
+    EXECUTABLE_SKILLS, pattern_recognition_handler, research_handler,
+    should_trigger_research, activity_summary_handler, should_trigger_activity_summary,
+)
 from ciel.tools.framework import default_tool_registry
 from ciel.evaluation.evaluator import Evaluator
 from ciel.orchestrator.engines import OllamaEngine, ClaudeEngine, CIEL0Engine
@@ -94,6 +97,10 @@ class Orchestrator:
             if "Research" in EXECUTABLE_SKILLS and should_trigger_research(user_input):
                 research_result = research_handler({"query": user_input}, self.memory)
                 parts += ["", "=== COMPUTED: WEB RESEARCH (free, real result) ===", research_result]
+
+            if "Communication" in EXECUTABLE_SKILLS and should_trigger_activity_summary(user_input):
+                summary_result = activity_summary_handler({}, self.memory)
+                parts += ["", "=== COMPUTED: ACTIVITY SUMMARY ===", summary_result]
 
         parts += [
             "",

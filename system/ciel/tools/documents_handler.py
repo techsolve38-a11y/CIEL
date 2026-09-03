@@ -42,3 +42,38 @@ def create_document(filename: str, content: str) -> str:
 
     candidate_path.write_text(content, encoding="utf-8")
     return f"Created '{filename}' in {DOCUMENTS_DIR} ({len(content)} characters)."
+
+
+def read_file(filename: str) -> str:
+    """Reads a text file from the same restricted DOCUMENTS_DIR that
+    create_document() writes to — same path-safety check, since 'read'
+    has the identical escape risk as 'write' (a filename like
+    '../../../etc/passwd' must be refused just as firmly)."""
+    DOCUMENTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    candidate_path = (DOCUMENTS_DIR / filename).resolve()
+    try:
+        candidate_path.relative_to(DOCUMENTS_DIR.resolve())
+    except ValueError:
+        return (f"Refused to read '{filename}': this path would escape the "
+                f"documents folder ({DOCUMENTS_DIR}). This is a safety restriction, not a bug.")
+
+    if not candidate_path.exists():
+        return f"No file named '{filename}' found in {DOCUMENTS_DIR}."
+    if not candidate_path.is_file():
+        return f"'{filename}' is not a file (it may be a directory)."
+
+    try:
+        return candidate_path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return f"'{filename}' isn't a text file — can't read it as text."
+
+
+def list_files() -> str:
+    """Lists what's actually available to read — useful so CIEL (or the
+    person testing it) doesn't have to guess filenames."""
+    DOCUMENTS_DIR.mkdir(parents=True, exist_ok=True)
+    files = sorted(p.name for p in DOCUMENTS_DIR.iterdir() if p.is_file())
+    if not files:
+        return f"No files in {DOCUMENTS_DIR} yet."
+    return f"Files in {DOCUMENTS_DIR}: " + ", ".join(files)
