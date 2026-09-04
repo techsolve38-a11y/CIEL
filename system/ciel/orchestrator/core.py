@@ -26,7 +26,7 @@ from ciel.skills.registry import SkillRegistry, seed_default_skills
 from ciel.skills.handlers import (
     EXECUTABLE_SKILLS, pattern_recognition_handler, research_handler,
     should_trigger_research, activity_summary_handler, should_trigger_activity_summary,
-    calculator_skill_handler, extract_math_expression,
+    calculator_skill_handler, extract_math_expression, urgency_handler, should_trigger_urgency,
 )
 from ciel.tools.framework import default_tool_registry
 from ciel.evaluation.evaluator import Evaluator
@@ -108,6 +108,10 @@ class Orchestrator:
                 if math_expr:
                     calc_result = calculator_skill_handler({"expression": math_expr}, self.memory)
                     parts += ["", "=== COMPUTED: CALCULATOR (real result) ===", calc_result]
+
+            if "Reasoning" in EXECUTABLE_SKILLS and should_trigger_urgency(user_input):
+                urgency_result = urgency_handler({}, self.memory)
+                parts += ["", "=== COMPUTED: URGENCY SCAN (real date comparison) ===", urgency_result]
 
         parts += [
             "",

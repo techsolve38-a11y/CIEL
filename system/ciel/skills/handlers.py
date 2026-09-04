@@ -163,6 +163,76 @@ def extract_math_expression(user_input: str):
     return candidate
 
 
+import datetime
+
+
+def _parse_event_datetime(content: str):
+    """Extract and parse a date/datetime from calendar memory content like
+    \"Upcoming calendar event: 'X' at 2026-08-30T09:00:00\". Returns None
+    (not an exception) for anything unparseable — a malformed or
+    unexpected date format should be silently skipped, not crash the
+    whole urgency scan over one bad entry."""
+    match = re.search(r"at (\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2})?)", content)
+    if not match:
+        return None
+    date_str = match.group(1)
+    try:
+        if "T" in date_str:
+            return datetime.datetime.fromisoformat(date_str)
+        # All-day events (Drive/Calendar sometimes give date-only, no time)
+        return datetime.datetime.fromisoformat(date_str + "T00:00:00")
+    except ValueError:
+        return None
+
+
+def urgency_handler(tool_input: dict, memory_store) -> str:
+    """Scans calendar-sourced memory for items happening soon — real date
+    math against the actual current time, not a guess."""
+    hours_threshold = tool_input.get("hours_threshold", 72)
+    memories = memory_store.query(category="user", limit=200)
+    now = datetime.datetime.now()
+
+    urgent, upcoming, unparseable = [], [], 0
+    for m in memories:
+        if m.source != "google_calendar":
+            continue
+        event_time = _parse_event_datetime(m.content)
+        if event_time is None:
+            unparseable += 1
+            continue
+        hours_until = (event_time - now).total_seconds() / 3600
+        if hours_until < 0:
+            continue   # already past — not urgent, just old
+        if hours_until <= hours_threshold:
+            urgent.append((hours_until, m.content))
+        else:
+            upcoming.append((hours_until, m.content))
+
+    lines = [f"Urgency scan (threshold: {hours_threshold} hours from now):"]
+    if urgent:
+        lines.append(f"\nURGENT — within {hours_threshold} hours ({len(urgent)}):")
+        for hours, content in sorted(urgent):
+            lines.append(f"  - [{hours:.1f}h away] {content}")
+    else:
+        lines.append(f"\nNothing urgent within {hours_threshold} hours.")
+    if upcoming:
+        lines.append(f"\nFurther out ({len(upcoming)}): " +
+                     ", ".join(c for _, c in sorted(upcoming)[:3]) +
+                     (f" ... and {len(upcoming)-3} more" if len(upcoming) > 3 else ""))
+    if unparseable:
+        lines.append(f"\n({unparseable} calendar entries had unparseable dates and were skipped.)")
+
+    return "\n".join(lines)
+
+
+URGENCY_TRIGGER_KEYWORDS = ("urgent", "deadline", "coming up", "soon", "today", "tomorrow", "this week")
+
+
+def should_trigger_urgency(user_input: str) -> bool:
+    lowered = user_input.lower()
+    return any(kw in lowered for kw in URGENCY_TRIGGER_KEYWORDS)
+
+
 # --- Registry: maps skill name -> (Anthropic tool schema, handler function) ---
 # Only skills with a REAL implementation appear here. A skill can exist in
 # skills/registry.py's metadata without appearing here — that just means
@@ -242,6 +312,24 @@ EXECUTABLE_SKILLS: dict[str, dict] = {
             },
         },
         "handler": calculator_skill_handler,
+    },
+    "Reasoning": {
+        "tool_schema": {
+            "name": "urgency_scan",
+            "description": (
+                "Scan calendar data for events happening soon, flagging what's "
+                "genuinely urgent based on real date comparison. Use this when "
+                "the user asks what's urgent, coming up, due soon, or needs "
+                "attention — this gives a real, computed answer, not a guess."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "hours_threshold": {"type": "number", "description": "Hours from now to count as urgent. Default 72."}
+                },
+            },
+        },
+        "handler": urgency_handler,
     },
 }
 
