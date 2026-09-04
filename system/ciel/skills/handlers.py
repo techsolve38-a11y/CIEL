@@ -126,6 +126,43 @@ def should_trigger_activity_summary(user_input: str) -> bool:
     return any(kw in lowered for kw in ACTIVITY_SUMMARY_TRIGGER_KEYWORDS)
 
 
+import re
+
+
+def calculator_skill_handler(tool_input: dict, memory_store) -> str:
+    from ciel.tools.calculator_handler import calculate
+    expression = tool_input.get("expression", "").strip()
+    if not expression:
+        return "No expression provided to calculate."
+    return calculate(expression)
+
+
+# Matches a contiguous arithmetic expression: starts and ends with a
+# digit, with only digits/operators/parens/decimal points/spaces in
+# between — this naturally excludes surrounding English words, since
+# letters aren't in the allowed character set.
+_MATH_LIKE_PATTERN = re.compile(r"\d[\d\.\+\-\*/%\(\)\s]*\d")
+
+
+def extract_math_expression(user_input: str):
+    match = _MATH_LIKE_PATTERN.search(user_input)
+    if not match:
+        return None
+    candidate = match.group().strip()
+    # Require at least one actual operator — otherwise a bare number
+    # sequence (e.g. part of a date or phone number) would incorrectly
+    # look like something to calculate.
+    if not any(op in candidate for op in "+-*/%"):
+        return None
+    # Reject tightly-packed digit-hyphen sequences like "2026-08-30" —
+    # real arithmetic typed in natural language almost always has spaces
+    # around operators ("23 * 47"); dates and similar identifiers don't.
+    # A simple, honest heuristic, not a perfect classifier.
+    if " " not in candidate:
+        return None
+    return candidate
+
+
 # --- Registry: maps skill name -> (Anthropic tool schema, handler function) ---
 # Only skills with a REAL implementation appear here. A skill can exist in
 # skills/registry.py's metadata without appearing here — that just means
@@ -187,6 +224,24 @@ EXECUTABLE_SKILLS: dict[str, dict] = {
             "input_schema": {"type": "object", "properties": {}},
         },
         "handler": activity_summary_handler,
+    },
+    "Capital Allocation": {
+        "tool_schema": {
+            "name": "calculate",
+            "description": (
+                "Evaluate a safe arithmetic expression (numbers and "
+                "+, -, *, /, **, % operators only — no code execution). "
+                "Use this for any math rather than guessing at arithmetic."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "expression": {"type": "string", "description": "The arithmetic expression, e.g. '23 * 47 + 12'."}
+                },
+                "required": ["expression"],
+            },
+        },
+        "handler": calculator_skill_handler,
     },
 }
 
