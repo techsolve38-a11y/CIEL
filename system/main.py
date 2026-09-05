@@ -12,6 +12,7 @@ import sys
 from ciel.orchestrator.core import Orchestrator
 from ciel.tools.external_ai_handler import call_external_model
 from ciel.user_model.commands import remember_fact, add_objective, list_user_model
+from ciel.user_model.health_commands import log_health, health_summary
 
 
 def print_status(orch: Orchestrator):
@@ -63,6 +64,12 @@ def main():
             continue
         if user_input.lower() == "!whoami": 
             print(f"\n{list_user_model()}\n"); 
+            continue
+        if user_input.startswith("!health "): 
+            print(f"\n{log_health(user_input[len('!health '):])}\n"); 
+            continue 
+        if user_input.lower() == "!healthlog": 
+            print(f"\n{health_summary()}\n"); 
             continue
 
         response = orch.process(user_input)
