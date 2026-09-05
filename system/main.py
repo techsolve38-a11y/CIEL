@@ -9,10 +9,12 @@ Usage:
 
 import sys
 
+
 from ciel.orchestrator.core import Orchestrator
 from ciel.tools.external_ai_handler import call_external_model
 from ciel.user_model.commands import remember_fact, add_objective, list_user_model
 from ciel.user_model.health_commands import log_health, health_summary
+from ciel.user_model.commands import remember_fact, add_objective, complete_objective, list_user_model, help_text
 
 
 def print_status(orch: Orchestrator):
@@ -70,6 +72,12 @@ def main():
             continue 
         if user_input.lower() == "!healthlog": 
             print(f"\n{health_summary()}\n"); 
+            continue
+        if user_input.startswith("!complete "): 
+            print(f"\n{complete_objective(user_input[len('!complete '):])}\n"); 
+            continue 
+        if user_input.lower() == "!help": 
+            print(f"\n{help_text()}\n"); 
             continue
 
         response = orch.process(user_input)

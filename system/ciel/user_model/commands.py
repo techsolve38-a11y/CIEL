@@ -45,6 +45,44 @@ def add_objective(text: str, priority: int = 1, horizon: str = "unspecified") ->
     return f"Objective added: '{text.strip()}' (priority {priority}, {len(profile.objectives)} total active objectives)"
 
 
+def complete_objective(search_text: str) -> str:
+    """Marks an objective as completed via partial, case-insensitive text
+    match — objectives were addable but never completable until now,
+    which meant the list could only ever grow."""
+    if not search_text.strip():
+        return "No objective text provided to match against."
+
+    store = UserProfileStore()
+    profile = store.load()
+    search_lower = search_text.strip().lower()
+
+    matches = [o for o in profile.objectives if o["status"] == "active" and search_lower in o["text"].lower()]
+
+    if not matches:
+        return f"No active objective found matching '{search_text}'."
+    if len(matches) > 1:
+        matched_texts = "; ".join(f"'{m['text']}'" for m in matches)
+        return f"Multiple active objectives match '{search_text}' — be more specific: {matched_texts}"
+
+    matches[0]["status"] = "completed"
+    store.save(profile)
+    return f"Marked as completed: '{matches[0]['text']}'"
+
+
+def help_text() -> str:
+    return """CIEL commands:
+  !ask <question>       Delegate a question to Ollama (or Claude, if configured) as a scoped resource
+  !remember <fact>       Save a permanent fact about yourself
+  !objective <text>      Add an objective
+  !complete <text>       Mark an objective as completed (partial text match)
+  !health <entry>        Log a health-related entry
+  !healthlog              Show your health log
+  !whoami                 Show everything CIEL knows about you directly (facts + objectives)
+  status                  Show system status (constitution, skills, tools, memory)
+  exit / quit             End the session
+Anything else is sent to CIEL-0 as an ordinary message."""
+
+
 def list_user_model() -> str:
     """Shows what CIEL currently knows about the person directly (not
     from synced data — from what's actually been told to it)."""
