@@ -69,6 +69,26 @@ def complete_objective(search_text: str) -> str:
     return f"Marked as completed: '{matches[0]['text']}'"
 
 
+def log_to_category(category: str, text: str) -> str:
+    """General logging for the memory categories that don't have a
+    dedicated command — decisions, lessons, knowledge, projects, skills.
+    (user/experiences/health each have their own purpose-built path
+    already: sync scripts, auto-logging, and !health respectively.)"""
+    from ciel.memory.store import MemoryStore, CATEGORIES
+    import datetime
+
+    category = category.strip().lower()
+    if category not in CATEGORIES:
+        return f"'{category}' isn't a valid category. Valid: {', '.join(CATEGORIES)}"
+    if not text.strip():
+        return f"No text provided to log under '{category}'."
+
+    memory = MemoryStore()
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    memory.add(category=category, content=f"[{timestamp}] {text.strip()}", source="user_reported", confidence=1.0)
+    return f"Logged under '{category}': {text.strip()}"
+
+
 def help_text() -> str:
     return """CIEL commands:
   !ask <question>       Delegate a question to Ollama (or Claude, if configured) as a scoped resource

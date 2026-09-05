@@ -14,7 +14,7 @@ from ciel.orchestrator.core import Orchestrator
 from ciel.tools.external_ai_handler import call_external_model
 from ciel.user_model.commands import remember_fact, add_objective, list_user_model
 from ciel.user_model.health_commands import log_health, health_summary
-from ciel.user_model.commands import remember_fact, add_objective, complete_objective, list_user_model, help_text
+from ciel.user_model.commands import remember_fact, add_objective, complete_objective, list_user_model, help_text, log_to_category
 
 
 def print_status(orch: Orchestrator):
@@ -78,6 +78,12 @@ def main():
             continue 
         if user_input.lower() == "!help": 
             print(f"\n{help_text()}\n"); 
+            continue
+        if user_input.startswith("!log "): 
+            parts = user_input[len("!log "):].split(" ", 1); 
+            print(f"\n{log_to_category(parts[0], parts[1]) 
+                       if len(parts) == 2 
+                       else 'Usage: !log <category> <text>'}\n"); 
             continue
 
         response = orch.process(user_input)
