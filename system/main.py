@@ -10,6 +10,8 @@ Usage:
 import sys
 
 from ciel.orchestrator.core import Orchestrator
+from ciel.tools.external_ai_handler import call_external_model
+from ciel.user_model.commands import remember_fact, add_objective, list_user_model
 
 
 def print_status(orch: Orchestrator):
@@ -49,6 +51,18 @@ def main():
             break
         if user_input.lower() == "status":
             print_status(orch)
+            continue
+        if user_input.startswith("!ask "): 
+            query = user_input[len("!ask "):].strip(); print(f"\n[Delegating to Ollama]: {call_external_model(query)}\n"); 
+            continue
+        if user_input.startswith("!remember "): 
+            print(f"\n{remember_fact(user_input[len('!remember '):])}\n"); 
+            continue 
+        if user_input.startswith("!objective "): 
+            print(f"\n{add_objective(user_input[len('!objective '):])}\n"); 
+            continue
+        if user_input.lower() == "!whoami": 
+            print(f"\n{list_user_model()}\n"); 
             continue
 
         response = orch.process(user_input)
