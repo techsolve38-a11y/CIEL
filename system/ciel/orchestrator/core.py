@@ -127,10 +127,28 @@ class Orchestrator:
 
     # ---- Core loop ----------------------------------------------------------
     def process(self, user_input: str) -> str:
-        system_context = self._assemble_context(user_input)
-        text = self.engine.generate(system_context, user_input)
+        import time
+        from ciel.evaluation.scoring import compute_task_completion, compute_time_efficiency
 
-        self.evaluator.log(interaction_summary=user_input[:120], scores={"task_completion": 1.0, "safety": 1.0})
+        system_context = self._assemble_context(user_input)
+
+        start = time.time()
+        text = self.engine.generate(system_context, user_input)
+        elapsed = time.time() - start
+
+        # REAL evaluation, replacing the old hardcoded {task_completion: 1.0,
+        # safety: 1.0} that got logged unconditionally on every interaction.
+        # Only metrics we can honestly compute get logged — the rest
+        # (accuracy, reasoning_quality, etc.) genuinely need human feedback
+        # or an LLM judge, and we don't fake numbers for those.
+        scores = {
+            "task_completion": compute_task_completion(text),
+            "time_cost_efficiency": compute_time_efficiency(elapsed),
+        }
+        self.evaluator.log(
+            interaction_summary=user_input[:120], scores=scores,
+            notes=f"engine={self.engine_name}, elapsed={elapsed:.2f}s",
+        )
         self.memory.add(
             category="experiences",
             content=f"User asked: {user_input[:200]} | CIEL responded: {text[:200]}",

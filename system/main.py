@@ -12,7 +12,6 @@ import sys
 
 from ciel.orchestrator.core import Orchestrator
 from ciel.tools.external_ai_handler import call_external_model
-from ciel.user_model.commands import remember_fact, add_objective, list_user_model
 from ciel.user_model.health_commands import log_health, health_summary
 from ciel.user_model.commands import remember_fact, add_objective, complete_objective, list_user_model, help_text, log_to_category
 
