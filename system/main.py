@@ -33,7 +33,17 @@ def print_status(orch: Orchestrator):
 
 
 def main():
-    orch = Orchestrator()
+    engine_choice = 'ciel0' if '--engine' in sys.argv else 'ciel0'
+    model_choice = 'llama3.2' if '--model' in sys.argv: idx = sys.argv.index('--model') if idx + 1 < len(sys.argv): model_choice = sys.argv[idx + 1]
+    if '--engine' in sys.argv:
+        idx = sys.argv.index('--engine')
+        if idx + 1 < len(sys.argv):
+            engine_choice = sys.argv[idx + 1]
+    if '--model' in sys.argv:
+        idx = sys.argv.index('--model')
+        if idx + 1 < len(sys.argv):
+            model_choice = sys.argv[idx + 1]
+    orch = Orchestrator(engine=engine_choice, ollama_model=model_choice)
 
     if "--status" in sys.argv:
         print_status(orch)

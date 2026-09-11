@@ -44,7 +44,7 @@ class OllamaEngine(ReasoningEngine):
     started automatically), with at least one model pulled (e.g.
     `ollama pull llama3.2`)."""
 
-    def __init__(self, model: str = "llama3.2", host: str = "http://localhost:11434", timeout: int = 120):
+    def __init__(self, model: str = "llama3.2", host: str = "http://localhost:11434", timeout: int = 300):
         self.model = model
         self.host = host
         self.timeout = timeout
